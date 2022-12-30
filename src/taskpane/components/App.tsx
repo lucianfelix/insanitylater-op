@@ -1,5 +1,12 @@
 import * as React from "react";
-import { DefaultButton } from "@fluentui/react";
+import {
+  ComboBox,
+  DefaultButton,
+  PrimaryButton, ProgressIndicator,
+  SelectableOptionMenuItemType,
+  Stack,
+  TextField
+} from "@fluentui/react";
 import Header from "./Header";
 import HeroList, { HeroListItem } from "./HeroList";
 import Progress from "./Progress";
@@ -18,141 +25,126 @@ export interface AppState {
   listItems: HeroListItem[];
 }
 
-export default class App extends React.Component<AppProps, AppState> {
-  constructor(props, context) {
-    super(props, context);
-    this.state = {
-      listItems: []
-    };
-  }
+export default function App(_props: AppProps) {
+  const [busy, setBusy] = React.useState<boolean>(false);
+  const [original, setOriginal] = React.useState<string | undefined>();
+  const [personaSelectedKey, setPersonaSelectedKey] = React.useState<string>("Software Engineer");
+  const personaOptions = [
+    { key: "Header1", text: "SFW", itemType: SelectableOptionMenuItemType.Header },
+    { key: "CEO", text: "CEO", disabled: false },
+    { key: "Vice President", text: "Vice President", disabled: false },
+    { key: "Manager", text: "Manager" },
+    { key: "Director", text: "Director" },
+    { key: "Software Engineer", text: "Software Engineer" },
+    { key: "Disgruntled worker", text: "Disgruntled worker" },
+    { key: "HR Person", text: "HR Person" },
+    { key: "divider", text: "-", itemType: SelectableOptionMenuItemType.Divider },
+    { key: "Header2", text: "NSFW", itemType: SelectableOptionMenuItemType.Header },
+    { key: "Big Lebowski", text: "Big Lebowski" }
+  ];
 
-  componentDidMount() {
-    this.setState({
-      listItems: [
-        {
-          icon: "Ribbon",
-          primaryText: "Achieve more with Office integration"
-        },
-        {
-          icon: "Unlock",
-          primaryText: "Unlock features and functionality"
-        },
-        {
-          icon: "Design",
-          primaryText: "Create and visualize like a pro"
-        }
-      ]
-    });
-  }
+  const [toneSelectedKey, setToneSelectedKey] = React.useState<string>("Constructive");
+  const toneOptions = [
+    { key: "Header1", text: "SFW", itemType: SelectableOptionMenuItemType.Header },
+    { key: "Constructive", text: "Constructive" },
+    { key: "Candid", text: "Candid" },
+    { key: "Genuine", text: "Genuine" },
+    { key: "Professional", text: "Professional" },
+    { key: "Polite", text: "Polite" },
+    { key: "Competent", text: "Competent (requires Premium💰)", disabled: false },
+    { key: "divider", text: "-", itemType: SelectableOptionMenuItemType.Divider },
+    { key: "Header2", text: "NSFW", itemType: SelectableOptionMenuItemType.Header },
+    { key: "Jackass", text: "Jackass" },
+    { key: "Accusing", text: "Accusing" },
+    { key: "Aggressive", text: "Aggressive" },
+    { key: "Disappointed", text: "Disappointed" },
+    { key: "Mocking", text: "Mocking" },
+    { key: "Brazen", text: "Brazen" },
+    { key: "Idiotic", text: "Idiotic" },
+    { key: "Humiliating", text: "Humiliating" }
+  ];
 
-  click = async () => {
+
+  const click = async () => {
+    let sourceToUse;
+
+    try {
+      setBusy(true);
+      if (original) {
+        sourceToUse = original;
+      } else {
+        sourceToUse = await getBody();
+        setOriginal(sourceToUse);
+      }
+
+      const proposal = await createProposal(sourceToUse, personaSelectedKey, toneSelectedKey);
+      await setBody(proposal);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reset = async () => {
+    // const sourceToUse = original? original : await getBody();
+    // const proposal = await createProposal(sourceToUse, personaSelectedKey, toneSelectedKey);
+    original && await setBody(original);
+    setOriginal(undefined);
+  };
+
+  return (
+    <Stack tokens={{ childrenGap: 10 }}>
+      <ComboBox
+        selectedKey={personaSelectedKey}
+        label="Persona"
+        autoComplete="on"
+        allowFreeform={false}
+        options={personaOptions}
+        onChange={(_event, option, _index, _value) => setPersonaSelectedKey("" + option.key)}
+      />
+
+      <ComboBox
+        selectedKey={toneSelectedKey}
+        label="Tone"
+        autoComplete="on"
+        allowFreeform={false}
+        options={toneOptions}
+        onChange={(_event, option, _index, _value) => setToneSelectedKey("" + option.key)}
+      />
+
+      {busy && <ProgressIndicator label="Mincing words.." />}
+
+      {!busy && <PrimaryButton onClick={click}>
+        Insanity Later
+      </PrimaryButton>}
+
+      {!busy && original && <DefaultButton onClick={reset}>
+        Reset
+      </DefaultButton>}
+    </Stack>
+  );
+}
+
+function getBody(): Promise<string> {
+  return new Promise((resolve, _reject) => {
     Office.context.mailbox.item.body.getAsync(
       Office.CoercionType.Text,
       { asyncContext: "This is passed to the callback" },
       function(asyncResult: Office.AsyncResult<string>) {
         const body = asyncResult.value;
-
-        createProposal(body).then((newBody) => {
-          Office.context.mailbox.item.body.setAsync(
-            newBody,
-            { asyncContext: "This is passed to the callback" },
-            function() {}
-          );
-        });
-        // console.log(result.value);
-        // console.log(result.asyncContext);
+        resolve(body)
       }
-    );
-    /**
-     * Insert your Outlook code here
-     */
-  };
+    )
+  });
+}
 
-  render() {
-    const { title, isOfficeInitialized } = this.props;
-
-    if (!isOfficeInitialized) {
-      return (
-        <Progress
-          title={title}
-          logo={require("./../../../assets/logo-filled.png")}
-          message="Please sideload your addin to see app body."
-        />
-      );
-    }
-
-    return (
-      <div className="ms-welcome">
-        <Header
-          logo={require("./../../../assets/logo-filled.png")}
-          title={this.props.title}
-          message="Serenity Now"
-        />
-
-        <p className="ms-font-l">Discover what AI can do for you today!.</p>
-
-
-        {/*Radio buttons: "PersonaExec" with options: Manager, Engineer, Big Lebowski*/}
-        <div className="ms-Grid-row">
-          <div className="ms-Grid-col ms-sm12 ms-md12 ms-lg12">
-            <div className="ms-Grid-row">
-              <div className="ms-Grid-col ms-sm6 ms-md6 ms-lg6">
-                <input type="radio" value="Manager" name="Persona" /> Manager
-              </div>
-              <div className="ms-Grid-col ms-sm6 ms-md6 ms-lg6">
-                <input type="radio" value="Engineer" name="Persona" /> Engineer
-              </div>
-              <div className="ms-Grid-col ms-sm6 ms-md6 ms-lg6">
-                <input
-                  type="radio"
-                  value="Big Lebowski"
-                  name="Persona"
-                />Big Lebowski
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/*Radio buttons: "Tone" with options: Professional, Bastard, Fellow Kids, Upbeat*/}
-        <div className="ms-Grid-row">
-          <div className="ms-Grid-col ms-sm12 ms-md12 ms-lg12">
-            <div className="ms-Grid-row">
-              <div className="ms-Grid-col ms-sm6 ms-md6 ms-lg6">
-                <input type="radio" value="Manager" name="Tone" /> Professional
-              </div>
-              <div className="ms-Grid-col ms-sm6 ms-md6 ms-lg6">
-                <input type="radio" value="Manager" name="Tone" /> Polite
-              </div>
-              <div className="ms-Grid-col ms-sm6 ms-md6 ms-lg6">
-                <input type="radio" value="Engineer" name="Tone" /> Disappointed
-              </div>
-              <div className="ms-Grid-col ms-sm6 ms-md6 ms-lg6">
-                <input type="radio" value="Engineer" name="Tone" /> Bastard
-              </div>
-            </div>
-          </div>
-        </div>
-
-
-
-
-
-        {/*Two buttons: Generate, Reset*/}
-        {/*Generate button: calls API, returns text, sets body to text*/}
-        {/*Reset button: clears body*/}
-        {/*<DefaultButton*/}
-        {/*  className="ms-welcome__action"*/}
-        {/*  iconProps={{ iconName: "ChevronRight" }}*/}
-        {/*  onClick={this.click}*/}
-        {/*>*/}
-        {/*  Generate*/}
-        {/*</DefaultButton>*/}
-
-
-        <DefaultButton className="ms-welcome__action" iconProps={{ iconName: "ChevronRight" }} onClick={this.click}>
-          Insanity Later
-        </DefaultButton>
-      </div>
-    );
-  }
+function setBody(text: string): Promise<void> {
+  return new Promise((resolve, _reject) => {
+    Office.context.mailbox.item.body.setAsync(
+      text,
+      { asyncContext: "This is passed to the callback" },
+      function() {
+        resolve();
+      }
+    )
+  });
 }
